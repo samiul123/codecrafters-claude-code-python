@@ -6,6 +6,7 @@ from openai import OpenAI
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+messages = []
 
 def _debug(message: str) -> None:
     if os.getenv("DEBUG") == "1":
@@ -18,38 +19,70 @@ def _get_attr(obj, name: str, default=None):
         return obj.get(name, default)
     return getattr(obj, name, default)
 
-def _normalize_message_content(content) -> str:
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    parts.append(text)
-                    continue
-            parts.append(str(item))
-        return "".join(parts)
-    return str(content)
+def read_file(file_path):
+    f = open(file_path)
+    text = f.read()
+    f.close()
+    return text
 
-def _execute_read_tool(arguments_json: str) -> None:
-    try:
-        arguments = json.loads(arguments_json)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"invalid tool arguments JSON: {e}") from e
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read and return the contents of a file",
+            "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                "type": "string",
+                "description": "The path to the file to read"
+                }
+            },
+            "required": ["file_path"]
+            }
+        }
+    }
+]
 
-    file_path = arguments.get("file_path")
-    if not isinstance(file_path, str) or not file_path:
-        raise RuntimeError("Read tool requires a non-empty file_path")
+tool_functions_map = {
+    "read_file": read_file
+}
 
-    with open(file_path, "rb") as f:
-        sys.stdout.buffer.write(f.read())
+# def _normalize_message_content(content) -> str:
+#     if content is None:
+#         return ""
+#     if isinstance(content, str):
+#         return content
+#     if isinstance(content, list):
+#         parts: list[str] = []
+#         for item in content:
+#             if isinstance(item, str):
+#                 parts.append(item)
+#                 continue
+#             if isinstance(item, dict):
+#                 text = item.get("text")
+#                 if isinstance(text, str):
+#                     parts.append(text)
+#                     continue
+#             parts.append(str(item))
+#         return "".join(parts)
+#     return str(content)
+
+# def _execute_read_tool(arguments_json: str) -> None:
+#     try:
+#         arguments = json.loads(arguments_json)
+#     except json.JSONDecodeError as e:
+#         raise RuntimeError(f"invalid tool arguments JSON: {e}") from e
+
+#     file_path = arguments.get("file_path")
+#     if not isinstance(file_path, str) or not file_path:
+#         raise RuntimeError("Read tool requires a non-empty file_path")
+
+#     with open(file_path, "rb") as f:
+#         sys.stdout.buffer.write(f.read())
+
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -59,60 +92,60 @@ def main():
     if not API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
-    client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-
-    chat = client.chat.completions.create(
-        model="anthropic/claude-haiku-4.5",
-        messages=[{"role": "user", "content": args.p}],
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "read_file",
-                    "description": "Read and return the contents of a file",
-                    "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to read"
-                        }
-                    },
-                    "required": ["file_path"]
-                    }
-                }
-            }
-        ]
-    )
-
-    if not chat.choices or len(chat.choices) == 0:
-        raise RuntimeError("no choices in response")
-
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    # print("Logs from your program will appear here!", file=sys.stderr)
-
-    # TODO: Uncomment the following line to pass the first stage
-    # print(chat.choices[0].message.content)
+    message = {
+        "role": "user",
+        "content": args.p
+    }
+    messages.append(message)
     
-    message = chat.choices[0].message
-    tool_calls = _get_attr(message, "tool_calls")
-    if tool_calls:
-        tool_call = tool_calls[0]
-        function = _get_attr(tool_call, "function")
-        name = _get_attr(function, "name")
-        arguments = _get_attr(function, "arguments")
+    client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    done = False
 
-        _debug(f"tool call: {name}")
+    while not done:
+        chat = client.chat.completions.create(
+            model="anthropic/claude-haiku-4.5",
+            messages=messages,
+            tools = tools
+        )
 
-        if name != "read_file":
-            raise RuntimeError(f"unsupported tool: {name}")
-        if not isinstance(arguments, str):
-            raise RuntimeError("tool arguments must be a JSON string")
-
-        _execute_read_tool(arguments)
-        return
-
-    sys.stdout.write(_normalize_message_content(_get_attr(message, "content")))
+        if not chat.choices or len(chat.choices) == 0:
+            raise RuntimeError("no choices in response")
+        
+        assistant_message = chat.choices[0].message
+        messages.append(
+            {
+                "role": "assistant",
+                "content": assistant_message.content,
+                "tool_calls": assistant_message.tool_calls,
+            }
+        )
+        
+        if assistant_message.tool_calls:
+            content = ""
+            
+            for tool_call in assistant_message.tool_calls:
+                function_name = tool_call.function.name
+                argumentsJson = tool_call.function.arguments
+                
+                # call the tool function and provide appropriate arguments
+                if function_name in tool_functions_map:
+                    tool_function = tool_functions_map[function_name]
+                    try:
+                        arguments = json.loads(argumentsJson)
+                        result = tool_function(**arguments)
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": result
+                            })
+                        
+                    except Exception as e:
+                        content += f"Error executing tool {function_name}: {e}"
+                                         
+        else:
+            done = True
+        
 
 
 
