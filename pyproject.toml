@@ -6,3 +6,6 @@ dependencies = [
     "openai>=2.17.0",
     "prompt-toolkit>=3.0.52",
 ]
+
+[project.scripts]
+bash-ai = "app.main:main"
