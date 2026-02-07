@@ -121,8 +121,6 @@ def main():
         )
         
         if assistant_message.tool_calls:
-            content = ""
-            
             for tool_call in assistant_message.tool_calls:
                 function_name = tool_call.function.name
                 argumentsJson = tool_call.function.arguments
@@ -141,7 +139,7 @@ def main():
                             })
                         
                     except Exception as e:
-                        content += f"Error executing tool {function_name}: {e}"
+                        print(f"Error calling tool function '{function_name}': {e}", file=sys.stderr)
                                          
         else:
             done = True
