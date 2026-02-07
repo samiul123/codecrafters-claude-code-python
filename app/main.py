@@ -7,7 +7,7 @@ from openai import OpenAI
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 
-MODEL="gpt-3.5-turbo"
+MODEL="anthropic/claude-haiku-4.5"
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
 messages = []
