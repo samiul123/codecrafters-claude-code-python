@@ -145,7 +145,8 @@ def main():
                                          
         else:
             done = True
-        
+    
+    print(messages[-1]["content"])
 
 
 
