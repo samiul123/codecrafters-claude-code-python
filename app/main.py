@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import json
+import subprocess
 from openai import OpenAI
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -23,6 +24,18 @@ def write_file(file_path, content):
         return "Write successful"
     except Exception as e:
         return f"Error writing file: {str(e)}"
+    
+def execute_bash(command):
+    if not command:
+        return "Error: 'command' argument is required"
+    print(f"Executing command: {command}", file=sys.stderr)
+    try:
+        result = subprocess.run(
+            str.split(command), check=True, text=True, capture_output=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Command failed with exit code {e.returncode}: {e.output}"
 
 tools = [
     {
@@ -42,7 +55,6 @@ tools = [
             }
         }
     },
-    
     {
         "type": "function",
         "function": {
@@ -63,48 +75,31 @@ tools = [
             }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bash",
+            "description": "Execute a shell command",
+            "parameters": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+                "command": {
+                "type": "string",
+                "description": "The command to execute"
+                }
+            }
+            }
+        }
     }
 ]
 
 tool_functions_map = {
     "read_file": read_file,
-    "write_file": write_file
+    "write_file": write_file,
+    "bash": execute_bash
 }
-
-# def _normalize_message_content(content) -> str:
-#     if content is None:
-#         return ""
-#     if isinstance(content, str):
-#         return content
-#     if isinstance(content, list):
-#         parts: list[str] = []
-#         for item in content:
-#             if isinstance(item, str):
-#                 parts.append(item)
-#                 continue
-#             if isinstance(item, dict):
-#                 text = item.get("text")
-#                 if isinstance(text, str):
-#                     parts.append(text)
-#                     continue
-#             parts.append(str(item))
-#         return "".join(parts)
-#     return str(content)
-
-# def _execute_read_tool(arguments_json: str) -> None:
-#     try:
-#         arguments = json.loads(arguments_json)
-#     except json.JSONDecodeError as e:
-#         raise RuntimeError(f"invalid tool arguments JSON: {e}") from e
-
-#     file_path = arguments.get("file_path")
-#     if not isinstance(file_path, str) or not file_path:
-#         raise RuntimeError("Read tool requires a non-empty file_path")
-
-#     with open(file_path, "rb") as f:
-#         sys.stdout.buffer.write(f.read())
-
-
 
 def main():
     p = argparse.ArgumentParser()
