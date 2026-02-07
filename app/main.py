@@ -104,7 +104,7 @@ def main():
 
         _debug(f"tool call: {name}")
 
-        if name != "Read":
+        if name != "read_file":
             raise RuntimeError(f"unsupported tool: {name}")
         if not isinstance(arguments, str):
             raise RuntimeError("tool arguments must be a JSON string")
