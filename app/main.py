@@ -8,22 +8,16 @@ API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
 messages = []
 
-def _debug(message: str) -> None:
-    if os.getenv("DEBUG") == "1":
-        print(f"debug: {message}", file=sys.stderr)
-
-def _get_attr(obj, name: str, default=None):
-    if obj is None:
-        return default
-    if isinstance(obj, dict):
-        return obj.get(name, default)
-    return getattr(obj, name, default)
-
 def read_file(file_path):
     f = open(file_path)
     text = f.read()
     f.close()
     return text
+
+def write_file(file_path, content):
+    with open(file_path, "w") as f:
+        f.write(content)
+    
 
 tools = [
     {
@@ -42,11 +36,34 @@ tools = [
             "required": ["file_path"]
             }
         }
+    },
+    
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Write content to a file",
+            "parameters": {
+            "type": "object",
+            "required": ["file_path", "content"],
+            "properties": {
+                "file_path": {
+                "type": "string",
+                "description": "The path of the file to write to"
+                },
+                "content": {
+                "type": "string",
+                "description": "The content to write to the file"
+                }
+            }
+            }
+        }
     }
 ]
 
 tool_functions_map = {
-    "read_file": read_file
+    "read_file": read_file,
+    "write_file": write_file
 }
 
 # def _normalize_message_content(content) -> str:
@@ -120,30 +137,31 @@ def main():
             }
         )
         
-        if assistant_message.tool_calls:
-            for tool_call in assistant_message.tool_calls:
-                function_name = tool_call.function.name
-                argumentsJson = tool_call.function.arguments
-                
-                # call the tool function and provide appropriate arguments
-                if function_name in tool_functions_map:
-                    tool_function = tool_functions_map[function_name]
-                    try:
-                        arguments = json.loads(argumentsJson)
-                        result = tool_function(**arguments)
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "content": result
-                            })
-                        
-                    except Exception as e:
-                        print(f"Error calling tool function '{function_name}': {e}", file=sys.stderr)
-                                         
-        else:
+        if not assistant_message.tool_calls:
             done = True
-    
+            continue
+        
+        
+        for tool_call in assistant_message.tool_calls:
+            function_name = tool_call.function.name
+            argumentsJson = tool_call.function.arguments
+            
+            # call the tool function and provide appropriate arguments
+            if function_name in tool_functions_map:
+                tool_function = tool_functions_map[function_name]
+                try:
+                    arguments = json.loads(argumentsJson)
+                    result = tool_function(**arguments)
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result
+                        })
+                    
+                except Exception as e:
+                    print(f"Error calling tool function '{function_name}': {e}", file=sys.stderr)
+                                                 
     print(messages[-1]["content"])
 
 
