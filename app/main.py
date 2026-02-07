@@ -89,10 +89,10 @@ def main():
         raise RuntimeError("no choices in response")
 
     # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!", file=sys.stderr)
+    # print("Logs from your program will appear here!", file=sys.stderr)
 
     # TODO: Uncomment the following line to pass the first stage
-    print(chat.choices[0].message.content)
+    # print(chat.choices[0].message.content)
     
     message = chat.choices[0].message
     tool_calls = _get_attr(message, "tool_calls")
