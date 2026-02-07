@@ -15,9 +15,14 @@ def read_file(file_path):
     return text
 
 def write_file(file_path, content):
-    with open(file_path, "w") as f:
-        f.write(content)
-    
+    if not file_path or content is None:
+        return "Error: 'file_path' and 'content' arguments are required"
+    try:
+        with open(file_path, "w") as f:
+            f.write(content)
+        return "Write successful"
+    except Exception as e:
+        return f"Error writing file: {str(e)}"
 
 tools = [
     {
@@ -140,7 +145,6 @@ def main():
         if not assistant_message.tool_calls:
             done = True
             continue
-        
         
         for tool_call in assistant_message.tool_calls:
             function_name = tool_call.function.name
