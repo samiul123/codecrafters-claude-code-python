@@ -10,10 +10,13 @@ BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v
 messages = []
 
 def read_file(file_path):
-    f = open(file_path)
-    text = f.read()
-    f.close()
-    return text
+    if not file_path:
+        return "Error: 'file_path' argument is required"
+    try:
+        with open(file_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
 
 def write_file(file_path, content):
     if not file_path or content is None:
@@ -159,11 +162,15 @@ def main():
                         })
                     
                 except Exception as e:
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": f"Error calling tool function '{function_name}': {str(e)}"
+                        })
                     print(f"Error calling tool function '{function_name}': {e}", file=sys.stderr)
                                                  
     print(messages[-1]["content"])
-
-
 
 if __name__ == "__main__":
     main()
